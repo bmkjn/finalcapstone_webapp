@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Excel Insights Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            padding: 40px;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin: auto;
+        }
+        h1 {
+            color: #333;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+        }
+        button {
+            background-color: #0078D4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        .download-links {
+            margin-top: 30px;
+        }
+        .download-links a {
+            display: block;
+            margin: 10px 0;
+            color: #0078D4;
+            text-decoration: none;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Excel File</h1>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+            <br>
+            <button type="submit">Generate PDF Report</button>
+        </form>
+
+        <div class="download-links" id="download-links"></div>
+
+        <div class="download-links" id="history-section">
+            <h3>Download Previous Reports:</h3>
+            <select id="history-dropdown">
+                <option value="">-- Select a report --</option>
+            </select>
+            <button id="download-history-btn">Download Selected</button>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const linksDiv = document.getElementById('download-links');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const fileInput = form.querySelector('input[type="file"]');
+            const file = fileInput.files[0];
+
+            if (file.size > 4 * 1024 * 1024) {
+                linksDiv.innerHTML = '❌ File too large. Please upload a file under 4MB.';
+                return;
+            }
+
+            linksDiv.innerHTML = 'Processing... Please wait ⏳';
+
+            try {
+                const response = await fetch(`${window.location.origin}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    linksDiv.innerHTML = '<h3>Download Your Reports:</h3>';
+                    result.pdfs.forEach(pdf => {
+                        const link = document.createElement('a');
+                        link.href = `${window.location.origin}/download/${pdf}`;
+                        link.textContent = pdf;
+                        link.download = pdf;
+                        linksDiv.appendChild(link);
+                    });
+                    loadHistory(); 
+                } else {
+                    linksDiv.innerHTML = `❌ Error: ${result.error || 'Report generation failed.'}`;
+                }
+            } catch (error) {
+                console.error(error);
+                linksDiv.innerHTML = '❌ Server error. Please try again.';
+            }
+        });
+
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${window.location.origin}/history`);
+                const result = await response.json();
+
+                const dropdown = document.getElementById('history-dropdown');
+                dropdown.innerHTML = '<option value="">-- Select a report --</option>';
+
+                if (result.pdfs && result.pdfs.length > 0) {
+                    result.pdfs.forEach(pdf => {
+                        const option = document.createElement('option');
+                        option.value = pdf;
+                        option.textContent = pdf;
+                        dropdown.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load history:', error);
+            }
+        }
+
+        document.getElementById('download-history-btn').addEventListener('click', () => {
+            const selected = document.getElementById('history-dropdown').value;
+            if (selected) {
+                window.location.href = `${window.location.origin}/download/${selected}`;
+            }
+        });
+
+        window.onload = loadHistory;
+    </script>
+</body>
+</html>
